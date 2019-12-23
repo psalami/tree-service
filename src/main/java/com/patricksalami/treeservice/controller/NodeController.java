@@ -24,8 +24,18 @@ public class NodeController {
 
     private final Logger logger = LoggerFactory.getLogger(NodeController.class);
 
+    /**
+     * Returns all descendants of the specified node to the client; we do not create a new Node object
+     * for each descendant in order to save time and to allow for very large result sets to be streamed directly
+     * from the database, without any server memory limitations. The size of the resulting subtree is only limited
+     * by the capacity of the database.
+     *
+     * @param nodeId
+     * @param response
+     * @return
+     */
     @RequestMapping(value = "/node/{id}/descendants", method = RequestMethod.GET)
-    public ResponseEntity<StreamingResponseBody> getNode(@PathVariable("id") int nodeId,
+    public ResponseEntity<StreamingResponseBody> getDescendants(@PathVariable("id") int nodeId,
                                                          final HttpServletResponse response) {
         response.setContentType("application/json");
         StreamingResponseBody stream = out -> {

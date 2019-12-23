@@ -30,11 +30,20 @@ public class NodeService {
         return resultNode;
     }
 
+    /**
+     * changes the parent of any node to any other valid node
+     *
+     * @param nodeId
+     * @param newParentId
+     * @throws RuntimeException
+     */
     @Transactional
     public void moveNode(int nodeId, int newParentId) throws RuntimeException {
+        // first, make sure we are moving a valid node to another valid node
         if (nodeId == newParentId) {
             throw new MoveAttemptToSelfException();
         }
+        // moving a node to one of its descendants is not allowed
         if (nodeRepository.isDescendantOf(nodeId, newParentId)) {
             throw new CyclicalTreeStructureException();
         }
@@ -47,8 +56,11 @@ public class NodeService {
             throw new InvalidNodeException(newParentId);
         }
 
+        //first, update the closure table to remove the parent-descendant relationships for all affected nodes
         nodeRepository.removeNodeFromParentUpdate(node.id, node.parentId);
+        //then, update the main nodes table with the new parent
         nodeRepository.updateNodesTableEntry(nodeId, newParentId);
+        //lastly, update the closure table with new parent-descendant entries for the moved node
         nodeRepository.addNodeToParentUpdate(nodeId, newParentId);
     }
 

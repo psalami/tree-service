@@ -41,6 +41,17 @@ public class NodeRepository {
 
     }
 
+    /**
+     * Streams all descendants of a given node to the provided OutputStream in JSON format using a fast and simple
+     * SELECT query;
+     * in order to support a large number of nodes in the subtree, we do not represent the nodes in memory and
+     * instead construct the JSON output on the fly as we are streaming rows from the db. Therefore we opt not to
+     * use JPA with this Repository.
+     *
+     * @param id
+     * @param outputStream
+     * @throws RuntimeException
+     */
     public void streamDescendantsById(int id, OutputStream outputStream) throws RuntimeException {
         try {
             var parameterSource = new MapSqlParameterSource()
@@ -67,6 +78,15 @@ public class NodeRepository {
         namedParameterJdbcTemplate.update(sql, parameterSource);
     }
 
+    /**
+     * Use a self-join to update the closure table; for each parent of the node that is being moved, we add the node
+     * and all of its descendants as parent-descendant relationships. This is called whenever a node is inserted or
+     * moved.
+     *
+     * @param nodeId
+     * @param parentId
+     * @throws RuntimeException
+     */
     public void addNodeToParentUpdate(int nodeId, int parentId) throws RuntimeException {
         var sql = "INSERT into children(parent, child, depth) " +
                 "SELECT p.parent, c.child, p.depth+c.depth+1 " +
@@ -94,6 +114,14 @@ public class NodeRepository {
         return namedParameterJdbcTemplate.queryForObject(sql, parameterSource, (resultSet, rowNumber) -> resultSet.getBoolean("exists"));
     }
 
+    /**
+     * This is the reverse of addNodeToParentUpdate; we delete all parent-descendant relationship for all parents
+     * of the node and the nodes in its subtree.
+     *
+     * @param nodeId
+     * @param parentId
+     * @throws RuntimeException
+     */
     public void removeNodeFromParentUpdate(int nodeId, int parentId) throws RuntimeException {
         var sql = "DELETE FROM children " +
                 "USING " +
@@ -129,6 +157,14 @@ public class NodeRepository {
         return resultNode;
     }
 
+    /**
+     * updates the main nodes table with a new node and its parent relationship; this is called whenever a node is
+     * updated or created
+     *
+     * @param nodeId
+     * @param newParentId
+     * @throws RuntimeException
+     */
     public void updateNodesTableEntry(int nodeId, int newParentId) throws RuntimeException {
         var sql = "UPDATE nodes  " +
                 "SET parent = :parentId " +
