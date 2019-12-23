@@ -4,10 +4,6 @@
 - [Introduction](#Introduction)
 - [Installation](#Installation)
 - [Usage](#Usage)
-    - [Get Descendants](#Get Descendants)
-    - [Move Node](#Move Node)
-    - [Create New Node](#Create New Node)
-    - [Error Handling](#Error Handling)
 - [Testing](#Testing)
 
 ## Introduction
