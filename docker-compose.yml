@@ -1,0 +1,30 @@
+version: '3'
+services:
+  test:
+    build: .
+    command: mvn -f /usr/src/app/pom.xml test
+    depends_on:
+      - postgresdb-test
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - test
+      - postgresdb
+  postgresdb:
+    image: postgres:12.1
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: treeservice
+      POSTGRES_PASSWORD: treeservice
+      POSTGRES_DB: treeservice
+  postgresdb-test:
+    image: postgres:12.1
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: treeservice-test
+      POSTGRES_PASSWORD: treeservice-test
+      POSTGRES_DB: treeservice-test

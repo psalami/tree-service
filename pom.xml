@@ -12,7 +12,7 @@
 	<artifactId>tree-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>tree-service</name>
-	<description>This service exposes endpoints to manage an employee tree structure</description>
+	<description>This service exposes endpoints to manage a tree structure with a large number of nodes.</description>
 
 	<properties>
 		<java.version>11</java.version>
