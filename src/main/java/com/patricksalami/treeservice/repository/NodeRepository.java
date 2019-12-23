@@ -1,21 +1,18 @@
 package com.patricksalami.treeservice.repository;
 
 
-import com.patricksalami.treeservice.model.Node;
+import com.patricksalami.treeservice.dao.Node;
 import com.patricksalami.treeservice.util.JsonResultSetExtractor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.InvalidResultSetAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import java.io.OutputStream;
-import java.sql.ResultSet;
 
 @Repository
 public class NodeRepository {
@@ -27,13 +24,21 @@ public class NodeRepository {
 
     public Node findById(int id) throws RuntimeException {
         var parameterSource = new MapSqlParameterSource()
-                .addValue("nodeId", id);
-        var sql = "SELECT id, parent as parentId, root as rootId\n" +
-                "FROM nodes\n" +
-                "WHERE id = :nodeId;";
-        return namedParameterJdbcTemplate.queryForObject(sql, parameterSource,
-                (resultSet, rowNumber) -> new Node(resultSet.getInt("id"),
-                        resultSet.getInt("parentId"), resultSet.getInt("rootId")));
+                .addValue("nodeId", id)
+                .addValue("rootNodeId", ROOT_NODE_ID);
+        var sql = "SELECT id, n.parent as parentId, n.root as rootId, d.depth as height " +
+                "FROM nodes n " +
+                "LEFT JOIN children d ON d.parent = :rootNodeId AND d.child = :nodeId " +
+                "WHERE id = :nodeId";
+        try {
+            return namedParameterJdbcTemplate.queryForObject(sql, parameterSource,
+                    (resultSet, rowNumber) -> new Node(resultSet.getInt("id"),
+                            resultSet.getInt("parentId"), resultSet.getInt("rootId"),
+                            resultSet.getInt("height")));
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+
     }
 
     public void streamDescendantsById(int id, OutputStream outputStream) throws RuntimeException {
@@ -46,7 +51,7 @@ public class NodeRepository {
                     "FROM " +
                     "children c " +
                     "LEFT JOIN nodes childNodes ON c.child = childNodes.id " +
-                    "LEFT JOIN children d ON d.parent = :rootNodeId and d.child = c.child " +
+                    "LEFT JOIN children d ON d.parent = :rootNodeId AND d.child = c.child " +
                     "WHERE c.parent = :nodeId AND c.child != :nodeId;";
             namedParameterJdbcTemplate.query(sql, parameterSource, new JsonResultSetExtractor(outputStream));
         } catch (DataAccessException e) {

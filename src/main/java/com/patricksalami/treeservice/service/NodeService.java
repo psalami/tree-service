@@ -3,7 +3,8 @@ package com.patricksalami.treeservice.service;
 import com.patricksalami.treeservice.exceptions.CyclicalTreeStructureException;
 import com.patricksalami.treeservice.exceptions.InvalidNodeException;
 import com.patricksalami.treeservice.exceptions.MoveAttemptToSelfException;
-import com.patricksalami.treeservice.model.Node;
+import com.patricksalami.treeservice.exceptions.NodeExistsException;
+import com.patricksalami.treeservice.dao.Node;
 import com.patricksalami.treeservice.repository.NodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,10 @@ public class NodeService {
 
     @Transactional
     public Node createNode(Node node) throws RuntimeException {
+        Node existingNode = nodeRepository.findById(node.id);
+        if(existingNode != null) {
+            throw new NodeExistsException();
+        }
         Node resultNode = nodeRepository.createNodesTableEntry(node);
         nodeRepository.createChildrenTableEntry(resultNode);
         nodeRepository.addNodeToParentUpdate(resultNode.id, resultNode.parentId);
