@@ -4,6 +4,10 @@
 - [Introduction](#Introduction)
 - [Installation](#Installation)
 - [Usage](#Usage)
+    - [Get Descendants](#Get Descendants)
+    - [Move Node](#Move Node)
+    - [Create New Node](#Create New Node)
+    - [Error Handling](#Error Handling)
 - [Testing](#Testing)
 
 ## Introduction
@@ -171,7 +175,7 @@ The new tree structure now looks like this:
            6  7 8
 ```
 
-#### Create new node
+#### Create New Node
 We can create additional nodes and insert them into the tree for further testing:
 
 ```

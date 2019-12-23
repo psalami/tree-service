@@ -2,13 +2,15 @@ version: '3'
 services:
   test:
     build: .
+    image: tree-service:latest
     command: mvn -f /usr/src/app/pom.xml test
     depends_on:
       - postgresdb-test
   api:
     build: .
+    image: tree-service:latest
     ports:
-      - "8080:8080"
+      - "8084:8084"
     depends_on:
       - test
       - postgresdb

@@ -1,6 +1,8 @@
 package com.patricksalami.treeservice;
 
-import com.patricksalami.treeservice.model.Node;
+import com.patricksalami.treeservice.exceptions.CyclicalTreeStructureException;
+import com.patricksalami.treeservice.exceptions.InvalidNodeException;
+import com.patricksalami.treeservice.dao.Node;
 import com.patricksalami.treeservice.service.NodeService;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -17,16 +19,6 @@ public class NodeServiceTests {
 
     @Autowired
     NodeService nodeService;
-
-
-    @Test
-    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
-    public void createNode() {
-        var n = new Node(2, 1, 1);
-        nodeService.createNode(n);
-        Node result = nodeService.findById(2);
-        assertEquals(result.id, 2);
-    }
 
     @Test
     @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
@@ -56,6 +48,49 @@ public class NodeServiceTests {
 
     @Test
     @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void moveNode() throws IOException {
+        nodeService.createNode(new Node(2, 1, 1));
+        nodeService.createNode(new Node(3, 1, 1));
+        nodeService.createNode(new Node(4, 2, 1));
+        nodeService.createNode(new Node(5, 2, 1));
+        nodeService.createNode(new Node(6, 4, 1));
+        nodeService.createNode(new Node(7, 4, 1));
+        nodeService.createNode(new Node(8, 4, 1));
+
+        // call to /api/v1/moveNode/4/3  -  moves node 4 (and its subtree) from parent 2 to to parent 3
+        nodeService.moveNode(4, 3);
+
+        // first check the previous parent to make sure it no longer has the moved subtree
+        var osTwo = new ByteArrayOutputStream();
+        nodeService.streamDescendantsById(2, osTwo);
+        osTwo.close();
+        String expectedOutputTwo = "[{\"id\":5,\"parentId\":2,\"rootId\":1,\"height\":2}]";
+        assertEquals(expectedOutputTwo, osTwo.toString());
+
+        // now check the new parent to make sure it has the moved subtree
+        var osThree = new ByteArrayOutputStream();
+        nodeService.streamDescendantsById(3, osThree);
+        osThree.close();
+        String expectedOutputThree = "[" +
+                "{\"id\":4,\"parentId\":3,\"rootId\":1,\"height\":2}," +
+                "{\"id\":6,\"parentId\":4,\"rootId\":1,\"height\":3}," +
+                "{\"id\":7,\"parentId\":4,\"rootId\":1,\"height\":3}," +
+                "{\"id\":8,\"parentId\":4,\"rootId\":1,\"height\":3}" +
+                "]";
+        assertEquals(expectedOutputThree, osThree.toString());
+    }
+
+    @Test
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void createNode() {
+        var n = new Node(2, 1, 1);
+        nodeService.createNode(n);
+        Node result = nodeService.findById(2);
+        assertEquals(result.id, 2);
+    }
+
+    @Test
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
     public void isDescendantOf() {
         nodeService.createNode(new Node(2, 1, 1));
         nodeService.createNode(new Node(3, 1, 1));
@@ -63,6 +98,33 @@ public class NodeServiceTests {
         assertTrue(nodeService.isDescendantOf(1, 4));
         assertFalse(nodeService.isDescendantOf(3, 4));
     }
+
+    @Test
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void noCycleAllowed() {
+        nodeService.createNode(new Node(2, 1, 1));
+        nodeService.createNode(new Node(3, 1, 1));
+        nodeService.createNode(new Node(4, 2, 1));
+        nodeService.createNode(new Node(5, 2, 1));
+        nodeService.createNode(new Node(6, 4, 1));
+        nodeService.createNode(new Node(7, 4, 1));
+        nodeService.createNode(new Node(8, 4, 1));
+        assertThrows(CyclicalTreeStructureException.class, () -> {
+            nodeService.moveNode(2, 4);
+        });
+    }
+
+    @Test
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void invalidNodeMove() {
+        nodeService.createNode(new Node(2, 1, 1));
+        assertThrows(InvalidNodeException.class, () -> {
+            nodeService.moveNode(2, 3);
+        });
+    }
+
+
+
 
 
 
