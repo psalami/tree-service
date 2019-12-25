@@ -20,14 +20,26 @@ public class NodeService {
 
     @Transactional
     public Node createNode(Node node) throws RuntimeException {
+        // first, ensure that a node with this id does not already exist
         Node existingNode = nodeRepository.findById(node.id);
         if(existingNode != null) {
             throw new NodeExistsException();
         }
+        // now, ensure that the parent node and root node of this node exist
+        Node parentNode = nodeRepository.findById(node.parentId);
+        if(parentNode == null) {
+            throw new InvalidNodeException(node.id);
+        }
+        Node rootNode = nodeRepository.findById(node.rootId);
+        if(rootNode == null) {
+            throw new InvalidNodeException(node.rootId);
+        }
         Node resultNode = nodeRepository.createNodesTableEntry(node);
         nodeRepository.createChildrenTableEntry(resultNode);
         nodeRepository.addNodeToParentUpdate(resultNode.id, resultNode.parentId);
-        return resultNode;
+        // in order to calculate height, we re-load the Node from the repo
+        Node outputNode = nodeRepository.findById(resultNode.id);
+        return outputNode;
     }
 
     /**
@@ -40,6 +52,7 @@ public class NodeService {
     @Transactional
     public void moveNode(int nodeId, int newParentId) throws RuntimeException {
         // first, make sure we are moving a valid node to another valid node
+        // moving a node to itself is not allowed
         if (nodeId == newParentId) {
             throw new MoveAttemptToSelfException();
         }

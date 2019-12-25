@@ -11,7 +11,8 @@ This is a REST API service based on Spring Boot that retrieves and modifies node
 is designed to handle a large number of nodes and incorporates persistence to disk using a Postgres database (but is
 designed to be database-agnostic). Several approaches were considered in order to accomplish both fast subtree 
 retrieval, fast subtree modification (changing the parent of a node), and data persistence. 
-In order to achieve data persistence, the data is stored in a database. Strategies for SQL-based subtree 
+In order to achieve both data persistence with strong consistency guarantees, as well as fast subtree retrieval
+and modification, a **materialized path** approach with a closure table is used. Strategies for SQL-based subtree 
 retrieval and modification that were considered included:
 
 - Adjacency lists
@@ -21,27 +22,31 @@ retrieval and modification that were considered included:
     - low memory footprint
 - Nested Sets
     - more complex to implement
-    - faster subtree retrieval but slower subtree modification
+    - very fast subtree retrieval but slower subtree modification
     - lower memory footprint
+    - can be implemented with any SQL database
 - Materialized Path (Closure Table)
     - relatively straightforward to implement
     - very fast subtree retrieval (as fast as nested sets)
     - fast subtree modification
     - very fast insertions
     - higher memory footprint
-- Database-specific approaches (i.e. Postgres ltree, Neo4J, etc)
+    - can be implemented with any SQL database
+- Database-specific approaches (i.e. Postgres ltree, Neo4J, recursive CTEs, etc)
     - locks into a specific database vendor
+    - may require additional infrastructure / maintenance
     - ltree performance comparable to custom materialized path implementation
 
 The materialized path approach was selected using a custom implementation of closure tables because it offers
 the fastest retrieval and modification times compared to the other approaches, while remaining completely
-database-agnostic.
+database-agnostic. The trade-off is a higher disk space requirement for the database compared to other approaches.
+
 This service is optimized to remain performant even with larger data volumes and therefore does not store retrieved
-nodes in memory; instead, data is streamed directly from the database to the HTTP client. Therefore, we cannot use any
-built-in persistence framework such as JPA / Hibernate. By passing the retrieved subtree data directly from the
-database to the client, we are not limited by the amount of memory available on the server node; instead the size of
-the dataset is limited by the amount of disk space available to the db, which could be scaled vertically 
-or horizontally.
+nodes in the application server's working memory; instead, data is streamed directly from the database to the 
+HTTP client. Therefore, we cannot use any built-in persistence framework such as JPA / Hibernate. 
+By passing the retrieved subtree data directly from the database to the client, we are not limited by the amount 
+of memory available on the server node; instead the size of the dataset is limited by the amount of disk space 
+available to the db, which could be scaled vertically or horizontally.
 
 ## Installation
 This service requires Docker and docker-compose to be installed on your system. 
@@ -68,7 +73,6 @@ The service comes pre-loaded with the following sample data:
    6  7 8
 ```
 
-The root node in the sample data is set to 1 and cannot be changed.
 
 #### Get Descendants
 Use the following command to return all descendants of any node.
@@ -179,6 +183,12 @@ $ curl -X POST \
    http://localhost:8084/api/v1/node \
    -H 'Content-Type: application/json' \
    -d '{"id": 9, "parentId": 2, "rootId": 1}'
+{
+  "id": 9,
+  "parentId": 2,
+  "rootId": 1,
+  "height": 2
+}
 ```
 
 We can verify that the new node was inserted at the correct position in the tree:
@@ -200,17 +210,31 @@ $ curl http://localhost:8084/api/v1/node/2/descendants
 ]
 ```
 
+#### Get Single Node
+We can get information about a single node using the following command:
+```
+$ curl http://localhost:8084/api/v1/node/4
+{
+  "id": 4,
+  "parentId": 2,
+  "rootId": 1,
+  "height": 2
+}
+```
+
 ## Error Handling
 
-If we try to move a node to one of its descendants, we get an error:
+If we try to move a node to one of its descendants, we get an HTTP 508 (Loop Detected) error:
 ```
-$ curl http://localhost:8084/api/v1/moveNode/4/6
+$ curl -I http://localhost:8084/api/v1/moveNode/4/6
+HTTP/1.1 508
 You may not move a node to one of its descendants
 ```
 
-If we try to move a node to a node that does not exist, we get an error:
+If we try to move a node to a node that does not exist, we get an HTTP 404 (Not Found) error:
 ```
 $ curl http://localhost:8084/api/v1/moveNode/4/99
+HTTP/1.1 404
 The specified node 99 does not exist
 ```
 

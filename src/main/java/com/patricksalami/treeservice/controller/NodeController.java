@@ -1,8 +1,5 @@
 package com.patricksalami.treeservice.controller;
-import com.patricksalami.treeservice.exceptions.CyclicalTreeStructureException;
-import com.patricksalami.treeservice.exceptions.InvalidNodeException;
-import com.patricksalami.treeservice.exceptions.MoveAttemptToSelfException;
-import com.patricksalami.treeservice.exceptions.NodeExistsException;
+import com.patricksalami.treeservice.exceptions.*;
 import com.patricksalami.treeservice.dao.Node;
 import com.patricksalami.treeservice.service.NodeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,8 +51,19 @@ public class NodeController {
 
     @RequestMapping(value = "/node", method = RequestMethod.POST)
     @ResponseStatus(HttpStatus.CREATED)
-    public void createNode(@RequestBody Node node) {
-        nodeService.createNode(node);
+    public Node createNode(@RequestBody Node node) {
+        // we don't allow node ID's of 0 in order to
+        // ensure that a value is set here
+        if(node.id == 0) {
+            throw new RequiredFieldException("id");
+        }
+        if(node.parentId == 0) {
+            throw new RequiredFieldException("parentId");
+        }
+        if(node.rootId == 0) {
+            throw new RequiredFieldException("rootId");
+        }
+        return nodeService.createNode(node);
     }
 
     @RequestMapping(value = "/node/{id}", method = RequestMethod.GET)
@@ -63,6 +71,14 @@ public class NodeController {
         return nodeService.findById(nodeId);
     }
 
+    /**
+     * changes the parent node of any node in the tree to a new parent by updating the database with new
+     * parent-descendant entries for each new parent and each of the descendants in the subtree, as well as the node
+     * itself
+     *
+     * @param nodeId
+     * @param newParentId
+     */
     @RequestMapping(value = "/moveNode/{id}/{newParentId}", method = RequestMethod.GET)
     @ResponseStatus(HttpStatus.OK)
     public void moveNode(@PathVariable("id") int nodeId, @PathVariable("newParentId") int newParentId) {
@@ -89,6 +105,12 @@ public class NodeController {
     @ExceptionHandler(NodeExistsException.class)
     public final ResponseEntity<String> handleAllExceptons(NodeExistsException e) {
         return new ResponseEntity<String>("A node with this ID already exists", HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(RequiredFieldException.class)
+    public final ResponseEntity<String> handleAllExceptions(RequiredFieldException e) {
+        return new ResponseEntity<String>(String.format("%s is a required field", e.getFieldName()),
+                HttpStatus.BAD_REQUEST);
     }
 
 }

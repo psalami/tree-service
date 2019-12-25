@@ -20,15 +20,20 @@ public class NodeRepository {
     @Autowired
     private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
-    public static final int ROOT_NODE_ID = 1;
-
+    /**
+     * returns a single Node object based on its id; the node height is determined by checking the entry in the closure
+     * table that links the node's root node to the node and referencing the depth column of that record
+     *
+     * @param id
+     * @return
+     * @throws RuntimeException
+     */
     public Node findById(int id) throws RuntimeException {
         var parameterSource = new MapSqlParameterSource()
-                .addValue("nodeId", id)
-                .addValue("rootNodeId", ROOT_NODE_ID);
+                .addValue("nodeId", id);
         var sql = "SELECT id, n.parent as parentId, n.root as rootId, d.depth as height " +
                 "FROM nodes n " +
-                "LEFT JOIN children d ON d.parent = :rootNodeId AND d.child = :nodeId " +
+                "LEFT JOIN children d ON d.parent = n.root AND d.child = :nodeId " +
                 "WHERE id = :nodeId";
         try {
             return namedParameterJdbcTemplate.queryForObject(sql, parameterSource,
@@ -55,14 +60,13 @@ public class NodeRepository {
     public void streamDescendantsById(int id, OutputStream outputStream) throws RuntimeException {
         try {
             var parameterSource = new MapSqlParameterSource()
-                    .addValue("nodeId", id)
-                    .addValue("rootNodeId", ROOT_NODE_ID);
+                    .addValue("nodeId", id);
             var sql = "SELECT c.child as \"id\", childNodes.parent as \"parentId\", childNodes.root as \"rootId\", " +
                     "d.depth as height " +
                     "FROM " +
                     "children c " +
                     "LEFT JOIN nodes childNodes ON c.child = childNodes.id " +
-                    "LEFT JOIN children d ON d.parent = :rootNodeId AND d.child = c.child " +
+                    "LEFT JOIN children d ON d.parent = childNodes.root AND d.child = c.child " +
                     "WHERE c.parent = :nodeId AND c.child != :nodeId;";
             namedParameterJdbcTemplate.query(sql, parameterSource, new JsonResultSetExtractor(outputStream));
         } catch (DataAccessException e) {
@@ -70,6 +74,12 @@ public class NodeRepository {
         }
     }
 
+    /**
+     * adds a single entry to the closure (children) table that links the node to itself as one of its descendants
+     *
+     * @param node
+     * @throws RuntimeException
+     */
     public void createChildrenTableEntry(Node node) throws RuntimeException {
         var sql = "INSERT INTO children(parent, child, depth) " +
                 "VALUES(:nodeId, :nodeId, 0)";
@@ -79,9 +89,15 @@ public class NodeRepository {
     }
 
     /**
-     * Use a self-join to update the closure table; for each parent of the node that is being moved, we add the node
-     * and all of its descendants as parent-descendant relationships. This is called whenever a node is inserted or
-     * moved.
+     * Use a self-join to update the closure (children) table; for each parent of the node that is being moved, we
+     * add a row that links the parent to the node being moved or inserted, as well as each of its descendants as
+     * parent-descendant relationships. This is called whenever a node is inserted or
+     * moved. In the case of insertions, this query only adds a single entry for each ancestor node, making insertions
+     * very fast.
+     *
+     * This approach makes it very easy to look up all descendants for a given node, at the expense of using additional
+     * memory; however, moving a node from one parent to another is fast allowing this approach to make strong
+     * consistency and atomicity guarantees.
      *
      * @param nodeId
      * @param parentId
@@ -98,6 +114,15 @@ public class NodeRepository {
         namedParameterJdbcTemplate.update(sql, parameterSource);
     }
 
+    /**
+     * references the closure table to check for an entry that links the parent node to the child node; if no such entry
+     * exists, then there is no parent-descendant relationship between the two nodes
+     *
+     * @param parentId
+     * @param childId
+     * @return
+     * @throws RuntimeException
+     */
     public boolean isDescendantOf(int parentId, int childId) throws RuntimeException {
         var sql = "SELECT CASE WHEN EXISTS (" +
                         "SELECT parent " +
@@ -115,7 +140,7 @@ public class NodeRepository {
     }
 
     /**
-     * This is the reverse of addNodeToParentUpdate; we delete all parent-descendant relationship for all parents
+     * This is the reverse of addNodeToParentUpdate; we delete all parent-descendant relationships for all parents
      * of the node and the nodes in its subtree.
      *
      * @param nodeId
@@ -136,6 +161,13 @@ public class NodeRepository {
         namedParameterJdbcTemplate.update(sql, parameterSource);
     }
 
+    /**
+     * creates a single entry in the main nodes table; this is called initially whenever a new node is created
+     *
+     * @param node
+     * @return
+     * @throws RuntimeException
+     */
     public Node createNodesTableEntry(Node node) throws RuntimeException {
         var sql = "INSERT INTO nodes(id, parent, root) " +
                 "VALUES (:nodeId, :parentId, :rootNodeId);";
@@ -159,7 +191,7 @@ public class NodeRepository {
 
     /**
      * updates the main nodes table with a new node and its parent relationship; this is called whenever a node is
-     * updated or created
+     * moved to a new parent
      *
      * @param nodeId
      * @param newParentId

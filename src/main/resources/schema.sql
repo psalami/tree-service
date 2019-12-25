@@ -1,7 +1,7 @@
 -- Table Definition ----------------------------------------------
 
 CREATE TABLE IF NOT EXISTS nodes (
-    id SERIAL PRIMARY KEY,
+    id integer PRIMARY KEY,
     parent integer REFERENCES nodes(id),
     root integer REFERENCES nodes(id)
 );

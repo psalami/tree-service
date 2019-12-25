@@ -91,6 +91,20 @@ public class NodeServiceTests {
 
     @Test
     @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void findById() {
+        nodeService.createNode(new Node(2, 1, 1));
+        nodeService.createNode(new Node(4, 2, 1));
+        Node n = nodeService.findById(4);
+        assertNotNull(n);
+        assertEquals(4, n.id);
+        assertEquals(2, n.parentId);
+        assertEquals(2, n.height);
+        assertEquals(1, n.rootId);
+
+    }
+
+    @Test
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
     public void isDescendantOf() {
         nodeService.createNode(new Node(2, 1, 1));
         nodeService.createNode(new Node(3, 1, 1));
@@ -120,6 +134,22 @@ public class NodeServiceTests {
         nodeService.createNode(new Node(2, 1, 1));
         assertThrows(InvalidNodeException.class, () -> {
             nodeService.moveNode(2, 3);
+        });
+    }
+
+    @Test
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void createWithInvalidRoot() {
+        assertThrows(InvalidNodeException.class, () -> {
+            nodeService.createNode(new Node(2, 1, 99));
+        });
+    }
+
+    @Test
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void createWithInvalidParent() {
+        assertThrows(InvalidNodeException.class, () -> {
+            nodeService.createNode(new Node(2, 99, 1));
         });
     }
 
