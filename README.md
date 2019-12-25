@@ -218,6 +218,21 @@ $ curl http://localhost:8084/api/v1/node/2/descendants
 ]
 ```
 
+*Note*: to create a new root node, create a new node without parentId and with rootId = id, for example:
+```
+$ curl -X POST \
+   http://localhost:8084/api/v1/node \
+   -H 'Content-Type: application/json' \
+   -d '{"id": 11, "rootId": 11}'
+{
+  "id": 11,
+  "parentId": 0,
+  "rootId": 11,
+  "height": 0
+}
+```
+A height of 0 and parentId of 0 indicates a root node. You may move any node / subtree under a new root node. 
+
 #### Get Single Node
 We can get information about a single node using the following command:
 ```
@@ -234,14 +249,14 @@ $ curl http://localhost:8084/api/v1/node/4
 
 If we try to move a node to one of its descendants, we get an HTTP 508 (Loop Detected) error:
 ```
-$ curl -I http://localhost:8084/api/v1/moveNode/4/6
+$ curl -i http://localhost:8084/api/v1/moveNode/4/6
 HTTP/1.1 508
 You may not move a node to one of its descendants
 ```
 
 If we try to move a node to a node that does not exist, we get an HTTP 404 (Not Found) error:
 ```
-$ curl http://localhost:8084/api/v1/moveNode/4/99
+$ curl -i http://localhost:8084/api/v1/moveNode/4/99
 HTTP/1.1 404
 The specified node 99 does not exist
 ```
