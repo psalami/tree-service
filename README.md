@@ -19,23 +19,30 @@ retrieval and modification that were considered included:
 - Adjacency lists
     - naive approach
     - easy to implement but very slow subtree retrieval
+    - expensive to determine height
     - very fast subtree modification
     - low memory footprint
+    - can be implemented with any SQL database
 - Nested Sets
     - more complex to implement
-    - very fast subtree retrieval but slower subtree modification
+    - very fast subtree retrieval but much slower O(n/2) subtree modification (insert, move, delete)
     - lower memory footprint
     - can be implemented with any SQL database
 - Materialized Path (Closure Table)
     - relatively straightforward to implement
     - very fast subtree retrieval (as fast as nested sets)
-    - fast subtree modification
+    - fast O(log n) (size of subtree) subtree modification
     - very fast insertions
     - higher memory footprint
     - can be implemented with any SQL database
-- Database-specific approaches (i.e. Postgres ltree, Neo4J, recursive CTEs, etc)
+- Materialized Path (Lineage Column)
+    - performance comparable to closure table
+    - more difficult to implement
+    - relies on string manipulation or Array type (vendor-specific)
+- Database-specific approaches / third-party libraries (i.e. Postgres ltree, Neo4J, recursive CTEs, django-treebeard, etc)
     - locks into a specific database vendor
     - may require additional infrastructure / maintenance
+    - may require specific tech stack (i.e. Python)
     - ltree performance comparable to custom materialized path implementation
 
 The materialized path approach was selected using a custom implementation of closure tables because it offers
@@ -251,18 +258,25 @@ Performance test results with Postgres 12.1 and Java 12, on a 2017 MacBook Pro 2
 **Write performance:**
 - Creating a tree with 100,000 nodes: 13m
 - Moving a node with height = 2 and number of descendants = 1,636: 550ms
+- Moving a node with height = 8 to height = 2 and number of descendants = 2: 35ms
+- Inserting a single node at height = 8: 14ms
+- Inserting a single node at height = 2: 14ms
+- Write time complexity is O(log n) (size of subtree)
 
 **Read performance:**
 - Get a single node: 2ms
 - Get all descendants for a node with 1,636 descendants: 33ms
 - Get all descendants for a node with 262 descendants: 5ms
 - Get all descendants for a node with 100,000 descendants: 3s
+- Read time complexity is O(log n) (size of subtree)
 
 **Memory:**
 - nodes table: 100,000 rows, 3 integer columns
 - closure table: 539,679 rows, 5 integer columns
 - size of indices on disc: 49mb
 - size of tables on disc: 32mb
+- server RAM space complexity is O(1) because data is only stored in the db
+- db disc space complexity is O(n*log n)
 
 We gained a 500x read performance improvements after de-normalizing some data in the closure table, at the
 expense of using two additional integer columns.
