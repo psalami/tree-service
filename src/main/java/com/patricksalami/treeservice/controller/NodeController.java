@@ -57,9 +57,6 @@ public class NodeController {
         if(node.id == 0) {
             throw new RequiredFieldException("id");
         }
-        if(node.parentId == 0) {
-            throw new RequiredFieldException("parentId");
-        }
         if(node.rootId == 0) {
             throw new RequiredFieldException("rootId");
         }
@@ -68,7 +65,11 @@ public class NodeController {
 
     @RequestMapping(value = "/node/{id}", method = RequestMethod.GET)
     public Node getNode(@PathVariable("id") int nodeId) {
-        return nodeService.findById(nodeId);
+        Node node = nodeService.findById(nodeId);
+        if(node == null) {
+            throw new InvalidNodeException(nodeId);
+        }
+        return node;
     }
 
     /**

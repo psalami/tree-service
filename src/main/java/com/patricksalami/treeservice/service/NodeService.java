@@ -27,11 +27,11 @@ public class NodeService {
         }
         // now, ensure that the parent node and root node of this node exist
         Node parentNode = nodeRepository.findById(node.parentId);
-        if(parentNode == null) {
-            throw new InvalidNodeException(node.id);
+        if(parentNode == null && node.parentId > 0) {
+            throw new InvalidNodeException(node.parentId);
         }
         Node rootNode = nodeRepository.findById(node.rootId);
-        if(rootNode == null) {
+        if(rootNode == null && node.id != node.rootId) {
             throw new InvalidNodeException(node.rootId);
         }
         Node resultNode = nodeRepository.createNodesTableEntry(node);
@@ -68,11 +68,17 @@ public class NodeService {
         if(newParent == null) {
             throw new InvalidNodeException(newParentId);
         }
+        int oldParentId = node.parentId;
+        node.parentId = newParentId;
+        // if we are moving the node to a new tree, update the root
+        node.rootId = newParent.rootId;
 
         //first, update the closure table to remove the parent-descendant relationships for all affected nodes
-        nodeRepository.removeNodeFromParentUpdate(node.id, node.parentId);
+        nodeRepository.removeNodeFromParentUpdate(node.id, oldParentId);
         //then, update the main nodes table with the new parent
-        nodeRepository.updateNodesTableEntry(nodeId, newParentId);
+        nodeRepository.updateNodesTableEntry(node);
+        //now, update the one record in the children table that references the node as its own descendant
+        nodeRepository.updateChildrenTableEntry(node);
         //lastly, update the closure table with new parent-descendant entries for the moved node
         nodeRepository.addNodeToParentUpdate(nodeId, newParentId);
     }

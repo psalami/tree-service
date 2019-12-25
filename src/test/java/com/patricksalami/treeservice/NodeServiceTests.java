@@ -163,7 +163,7 @@ public class NodeServiceTests {
     @Disabled("generating performance test data takes a while")
     @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
     public void preparePerformanceTestData() {
-        final int limit = 10000;
+        final int limit = 100000;
         Random r = new Random();
 
         for(int i = 2; i < limit; i++) {

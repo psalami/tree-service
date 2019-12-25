@@ -5,6 +5,7 @@
 - [Installation](#Installation)
 - [Usage](#Usage)
 - [Testing](#Testing)
+- [Performance](#Performance)
 
 ## Introduction
 This is a REST API service based on Spring Boot that retrieves and modifies nodes in a tree structure. The service
@@ -243,3 +244,25 @@ To run unit tests again:
 ```
 $ docker-compose run test
 ```
+
+## Performance
+Performance test results with Postgres 12.1 and Java 12, on a 2017 MacBook Pro 2.9Ghz Core i7 CPU with 16GB RAM:
+
+**Write performance:**
+- Creating a tree with 100,000 nodes: 13m
+- Moving a node with height = 2 and number of descendants = 1,636: 550ms
+
+**Read performance:**
+- Get a single node: 2ms
+- Get all descendants for a node with 1,636 descendants: 33ms
+- Get all descendants for a node with 262 descendants: 5ms
+- Get all descendants for a node with 100,000 descendants: 3s
+
+**Memory:**
+- nodes table: 100,000 rows, 3 integer columns
+- closure table: 539,679 rows, 5 integer columns
+- size of indices on disc: 49mb
+- size of tables on disc: 32mb
+
+We gained a 500x read performance improvements after de-normalizing some data in the closure table, at the
+expense of using two additional integer columns.
