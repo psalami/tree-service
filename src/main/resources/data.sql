@@ -13,7 +13,7 @@ VALUES
 (8,4,1) ON CONFLICT DO NOTHING;
 
 
-INSERT INTO "public"."children"("parent","child","depth")
+INSERT INTO "public"."children"("ancestor","descendant","depth")
 VALUES
 (1,1,0),
 (1,2,1),

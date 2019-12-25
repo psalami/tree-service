@@ -33,7 +33,7 @@ public class NodeRepository {
                 .addValue("nodeId", id);
         var sql = "SELECT id, n.parent as parentId, n.root as rootId, d.depth as height " +
                 "FROM nodes n " +
-                "LEFT JOIN children d ON d.parent = n.root AND d.child = :nodeId " +
+                "LEFT JOIN children d ON d.ancestor = n.root AND d.descendant = :nodeId " +
                 "WHERE id = :nodeId";
         try {
             return namedParameterJdbcTemplate.queryForObject(sql, parameterSource,
@@ -61,13 +61,13 @@ public class NodeRepository {
         try {
             var parameterSource = new MapSqlParameterSource()
                     .addValue("nodeId", id);
-            var sql = "SELECT c.child as \"id\", childNodes.parent as \"parentId\", childNodes.root as \"rootId\", " +
+            var sql = "SELECT c.descendant as \"id\", childNodes.parent as \"parentId\", childNodes.root as \"rootId\", " +
                     "d.depth as height " +
                     "FROM " +
                     "children c " +
-                    "LEFT JOIN nodes childNodes ON c.child = childNodes.id " +
-                    "LEFT JOIN children d ON d.parent = childNodes.root AND d.child = c.child " +
-                    "WHERE c.parent = :nodeId AND c.child != :nodeId;";
+                    "LEFT JOIN nodes childNodes ON c.descendant = childNodes.id " +
+                    "LEFT JOIN children d ON d.ancestor = childNodes.root AND d.descendant = c.descendant " +
+                    "WHERE c.ancestor = :nodeId AND c.descendant != :nodeId;";
             namedParameterJdbcTemplate.query(sql, parameterSource, new JsonResultSetExtractor(outputStream));
         } catch (DataAccessException e) {
             throw new RuntimeException(e);
@@ -81,7 +81,7 @@ public class NodeRepository {
      * @throws RuntimeException
      */
     public void createChildrenTableEntry(Node node) throws RuntimeException {
-        var sql = "INSERT INTO children(parent, child, depth) " +
+        var sql = "INSERT INTO children(ancestor, descendant, depth) " +
                 "VALUES(:nodeId, :nodeId, 0)";
         var parameterSource = new MapSqlParameterSource()
                 .addValue("nodeId", node.id);
@@ -104,10 +104,10 @@ public class NodeRepository {
      * @throws RuntimeException
      */
     public void addNodeToParentUpdate(int nodeId, int parentId) throws RuntimeException {
-        var sql = "INSERT into children(parent, child, depth) " +
-                "SELECT p.parent, c.child, p.depth+c.depth+1 " +
+        var sql = "INSERT into children(ancestor, descendant, depth) " +
+                "SELECT p.ancestor, c.descendant, p.depth+c.depth+1 " +
                 "FROM children p, children c " +
-                "WHERE p.child=:parentId and c.parent=:childId";
+                "WHERE p.descendant=:parentId and c.ancestor=:childId";
         var parameterSource = new MapSqlParameterSource()
                 .addValue("parentId", parentId)
                 .addValue("childId", nodeId);
@@ -125,9 +125,9 @@ public class NodeRepository {
      */
     public boolean isDescendantOf(int parentId, int childId) throws RuntimeException {
         var sql = "SELECT CASE WHEN EXISTS (" +
-                        "SELECT parent " +
+                        "SELECT ancestor " +
                         "FROM children " +
-                        "WHERE parent = :parentId AND child = :childId" +
+                        "WHERE ancestor = :parentId AND descendant = :childId" +
                     ") " +
                     "THEN TRUE " +
                     "ELSE FALSE " +
@@ -150,11 +150,11 @@ public class NodeRepository {
     public void removeNodeFromParentUpdate(int nodeId, int parentId) throws RuntimeException {
         var sql = "DELETE FROM children " +
                 "USING " +
-                "(SELECT link.parent AS parent, link.child AS child, link.depth AS depth " +
+                "(SELECT link.ancestor AS ancestor, link.descendant AS descendant, link.depth AS depth " +
                 " FROM children p, children link, children c " +
-                " WHERE p.parent = link.parent AND c.child = link.child " +
-                "   AND p.child=:parentId AND c.parent=:childId) l " +
-                "WHERE children.parent = l.parent AND children.child = l.child AND children.depth = l.depth";
+                " WHERE p.ancestor = link.ancestor AND c.descendant = link.descendant " +
+                "   AND p.descendant=:parentId AND c.ancestor=:childId) l " +
+                "WHERE children.ancestor = l.ancestor AND children.descendant = l.descendant AND children.depth = l.depth";
         var parameterSource = new MapSqlParameterSource()
                 .addValue("parentId", parentId)
                 .addValue("childId", nodeId);

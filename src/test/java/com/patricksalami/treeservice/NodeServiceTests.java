@@ -4,18 +4,24 @@ import com.patricksalami.treeservice.exceptions.CyclicalTreeStructureException;
 import com.patricksalami.treeservice.exceptions.InvalidNodeException;
 import com.patricksalami.treeservice.dao.Node;
 import com.patricksalami.treeservice.service.NodeService;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Random;
 
 @SpringBootTest
 public class NodeServiceTests {
+
+    private final Logger logger = LoggerFactory.getLogger(NodeServiceTests.class);
 
     @Autowired
     NodeService nodeService;
@@ -152,6 +158,37 @@ public class NodeServiceTests {
             nodeService.createNode(new Node(2, 99, 1));
         });
     }
+
+    @Test
+    @Disabled("generating performance test data takes a while")
+    @Sql(executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, scripts = "classpath:data.sql")
+    public void preparePerformanceTestData() {
+        final int limit = 10000;
+        Random r = new Random();
+
+        for(int i = 2; i < limit; i++) {
+            int parentId;
+            if(i == 2) {
+                parentId = 1;
+            } else {
+                parentId = (r.nextInt(i - 2) + 2) / 10;
+                if(parentId < 3) {
+                    parentId = 2;
+                }
+            }
+            var n = new Node(i, parentId, 1);
+            nodeService.createNode(n);
+        }
+    }
+
+    @Test
+    @Disabled("first prepare performance test data with preparePerformanceTestData")
+    public void performanceTest() throws IOException {
+        var os = new ByteArrayOutputStream();
+        nodeService.streamDescendantsById(20, os);
+        os.close();
+    }
+
 
 
 
